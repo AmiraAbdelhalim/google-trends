@@ -1,0 +1,11 @@
+# django
+*.pyc
+__pycache__
+
+# Environments
+.env
+.pgpass
+.pg_service.conf
+
+.idea
+.idea/*
