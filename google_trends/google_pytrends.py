@@ -15,10 +15,16 @@ def connect_to_pytrends():
         return pytrend
     except AttributeError:
         print('pytrend id none')
-        return None
+        return {
+            'error': True,
+            'msg': 'Attribute Error'
+        }
     except Exception as e:
         print('Exception in pytrends connection=> ', e)
-        return None
+        return {
+            'error': True,
+            'msg': 'something went wrong'
+        }
 
 
 def get_historical_interest_api(**kwargs):
@@ -44,16 +50,33 @@ def get_historical_interest_api(**kwargs):
             return historical_interest_json
         except requests.exceptions.ConnectionError:
             print('ConnectionError')
-            return {}
+            return {
+                'error': True,
+                'msg': 'connection error'
+            }
         except requests.exceptions.ReadTimeout:
             print('ReadTimeout')
-            return {}
+            return {
+                'error': True,
+                'msg': 'read timeout error'
+            }
         except urllib3.exceptions.ReadTimeoutError:
             print('ReadTimeoutError')
-            return {}
+            return {
+                'error': True,
+                'msg': 'read timeout error'
+            }
         except socket.timeout:
             print('timeout')
-            return {}
+            return {
+                'error': True,
+                'msg': 'socket time out error'
+            }
+        except Exception as e:
+            return {
+                'error': True,
+                'msg': 'something went wrong'
+            }
 
 
 # x = get_historical_interest_api(kw_list=['wild cat'], year_start=2021, month_start=2, day_start=6, hour_start=0,

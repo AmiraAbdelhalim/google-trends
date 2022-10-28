@@ -1,12 +1,16 @@
 import json
 
+from django.http import JsonResponse
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
 from .google_pytrends import get_historical_interest_api
 import datetime
 from .models import HistoricalInterestKeyWord, HistoricalInterest
+from django.contrib import messages
 
 
 # Create your views here.
+@csrf_exempt
 def search_trends(request):
     today = datetime.datetime.now()
     if request.method == "POST":
@@ -31,6 +35,10 @@ def search_trends(request):
         historical_data = get_historical_interest_api(kw_list=kw_list, year_start=year_start, month_start=month_start,
                                                       day_start=day_start, hour_start=hour_start, year_end=year_end,
                                                       month_end=month_end, day_end=day_end, hour_end=hour_end)
+        print('historical_data ', historical_data)
+        if 'error' in historical_data:
+            messages.add_message(request, messages.ERROR, historical_data.get('msg'))
+            return render(request, 'google_trends/trends.html', {})
 
         if historical_data:
             print('historical_data => ', historical_data)
@@ -41,6 +49,7 @@ def search_trends(request):
             list_of_trends = []
             list_of_partials = []
             historical_data_dic = {}
+            interests_record_list = []
             for record in historical_data:
                 if record == 'date':
                     print(historical_data[record])
@@ -56,7 +65,15 @@ def search_trends(request):
                 historical_data_dic['is_partial'] = list_of_partials[index]
                 if kw:
                     interests = HistoricalInterest.objects.create(search_key=kw, **historical_data_dic)
-                    interests.save()
+                    interests_record = interests.save()
+                    interests_record_list.append(interests_record)
+            context = {
+                'data': {
+                    'kw': kw,
+                    'interests_record_list': interests_record_list
+                }
+            }
+            return render(request, 'google_trends/trends.html', context)
     return render(request, 'google_trends/trends.html', {})
 
 
@@ -84,3 +101,27 @@ def get_hour_value(time, key):
     elif key == 'end':
         time_dict['hour_end'] = int(split_time[0])
         return time_dict
+
+
+def get_historical_interests_data(request, search_keyword):
+    print('hello ')
+    interest_keyword = None
+    interest_serializer = {}
+    try:
+        print('try')
+        interest_keyword = HistoricalInterestKeyWord.objects.get(search_keyword=search_keyword)
+    except HistoricalInterestKeyWord.DoesNotExist:
+        print('interest_keyword does not exist')
+        interest_serializer = {
+            'success': False,
+            'msg': 'keyword does not exist'
+        }
+    if interest_keyword:
+        print('interest_keyword')
+        interests = list(HistoricalInterest.objects.filter(search_key_id=interest_keyword.id).values())
+        interest_serializer = {
+            'success': True,
+            'search_keyword': search_keyword,
+            'interests': interests
+        }
+    return JsonResponse(interest_serializer, safe=False)
