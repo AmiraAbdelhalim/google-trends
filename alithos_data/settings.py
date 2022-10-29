@@ -74,13 +74,23 @@ WSGI_APPLICATION = 'alithos_data.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'OPTIONS': {
+#             'service': 'alithos_service',
+#             'passfile': '.pgpass',
+#         },
+#     }
+# }
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'OPTIONS': {
-            'service': 'alithos_service',
-            'passfile': '.pgpass',
-        },
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "alithos",
+        "USER": "alithos",
+        "PASSWORD": "alithos",
+        "HOST": "db",
+        "PORT": 5432,
     }
 }
 
