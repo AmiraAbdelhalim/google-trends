@@ -3,9 +3,9 @@ import json
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
-from .google_pytrends import get_historical_interest_api
+from .google_pytrends import get_historical_interest_api, get_interests_by_region
 import datetime
-from .models import HistoricalInterestKeyWord, HistoricalInterest
+from .models import HistoricalInterestKeyWord, HistoricalInterest, RegionInterests
 from django.contrib import messages
 
 
@@ -35,13 +35,11 @@ def search_trends(request):
         historical_data = get_historical_interest_api(kw_list=kw_list, year_start=year_start, month_start=month_start,
                                                       day_start=day_start, hour_start=hour_start, year_end=year_end,
                                                       month_end=month_end, day_end=day_end, hour_end=hour_end)
-        print('historical_data ', historical_data)
         if 'error' in historical_data:
             messages.add_message(request, messages.ERROR, historical_data.get('msg'))
             return render(request, 'google_trends/trends.html', {})
 
         if historical_data:
-            print('historical_data => ', historical_data)
             kw = HistoricalInterestKeyWord.objects.create(search_keyword=kw_list[0])
             kw.save()
             historical_data = json.loads(historical_data)
@@ -67,13 +65,6 @@ def search_trends(request):
                     interests = HistoricalInterest.objects.create(search_key=kw, **historical_data_dic)
                     interests_record = interests.save()
                     interests_record_list.append(interests_record)
-            context = {
-                'data': {
-                    'kw': kw,
-                    'interests_record_list': interests_record_list
-                }
-            }
-            return render(request, 'google_trends/trends.html', context)
     return render(request, 'google_trends/trends.html', {})
 
 
@@ -108,10 +99,8 @@ def get_historical_interests_data(request, search_keyword):
     interest_keyword = None
     interest_serializer = {}
     try:
-        print('try')
         interest_keyword = HistoricalInterestKeyWord.objects.get(search_keyword=search_keyword)
     except HistoricalInterestKeyWord.DoesNotExist:
-        print('interest_keyword does not exist')
         interest_serializer = {
             'success': False,
             'msg': 'keyword does not exist'
@@ -125,3 +114,47 @@ def get_historical_interests_data(request, search_keyword):
             'interests': interests
         }
     return JsonResponse(interest_serializer, safe=False)
+
+
+@csrf_exempt
+def search_region(request):
+    if request.method == "POST":
+        keywords = [request.POST.get('keyword1'), request.POST.get('keyword2')] \
+            if request.POST.get('keyword1') and request.POST.get('keyword2') else []
+        resolution = request.POST.get('resolution') if request.POST.get('resolution') else 'COUNTRY'
+        largest_region_len = request.POST.get('largest_regions_len') if request.POST.get('largest_regions_len') else 10
+        interested_regions = get_interests_by_region(keywords, resolution, largest_region_len)
+        if interested_regions and 'error' in interested_regions:
+            messages.add_message(request, messages.ERROR, interested_regions.get('msg'))
+            return render(request, 'google_trends/regions.html', {})
+        if interested_regions:
+            interested_regions = json.loads(interested_regions)
+            for key in interested_regions:
+                print('key ', key)
+                for regions_trends in interested_regions[key]:
+                    print('$$$ ', interested_regions[key][regions_trends])
+                    print(regions_trends)
+                    regions = RegionInterests.objects.create(keyword1=keywords[0], keyword2=keywords[1],
+                                                             region=regions_trends,
+                                                             trends=interested_regions[key][regions_trends])
+                    regions.save()
+    return render(request, 'google_trends/regions.html', {})
+
+
+def get_regions_data(request, kw1, kw2):
+    regions = list(RegionInterests.objects.filter(keyword1=kw1, keyword2=kw2).values('region', 'trends'))
+    regions_list = list(RegionInterests.objects.filter(keyword1=kw1, keyword2=kw2).values('region'))
+    trends_list = list(RegionInterests.objects.filter(keyword1=kw1, keyword2=kw2).values('trends'))
+    regions_serializer = {}
+    if regions:
+        regions_serializer = {
+            'success': True,
+            'keyword1': kw1,
+            'keyword2': kw2,
+            'regions': regions,
+            'regions_list': regions_list,
+            'trends_list': trends_list
+        }
+    return JsonResponse(regions_serializer, safe=False)
+
+
